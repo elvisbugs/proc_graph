@@ -21,16 +21,12 @@ public:
 	map<string, Texture> textures;
 	GLint textureQtd;
 
-	GLfloat euclidianColor;
-
-	GLint pos;
-
 public:
 	Shader() { textureQtd = 0; }
 	~Shader();
 
-	Shader( const GLchar* vertexPath, const GLchar* fragmentPath, int pos) : Shader() {
-
+	Shader( const GLchar* vertexPath, const GLchar* fragmentPath) : Shader() {
+		
 		// Get vertex and fragment shaders source codes from files' paths
 		std::string vertexCode;
 		std::string fragmentCode;
@@ -140,8 +136,19 @@ public:
 
 	void setRGB(GLfloat r, GLfloat g, GLfloat b)
 	{
-		euclidianColor = sqrt(pow(r,2) + pow(g, 2) + pow(b, 2));
+		euclidianColor = sqrt(pow(r*255,2) + pow(g*255, 2) + pow(b*255, 2));
 	}
+
+	GLfloat getRGB() { return euclidianColor; }
+
+	void setShaderOff() { shaderState = false; }
+
+	GLboolean getShaderStatus() { return shaderState; }
+
+private:
+	GLfloat euclidianColor;
+
+	GLboolean shaderState = true;
 };
 
 #endif

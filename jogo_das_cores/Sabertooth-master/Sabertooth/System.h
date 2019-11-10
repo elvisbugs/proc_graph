@@ -40,10 +40,11 @@ private:
 		return r3;
 	}
 
+	vector<Shader*>* shaderMap;
+
 public:
 	GLFWwindow* window;
-	vector<Shader*> *shaderMap;
-
+	
 	void setWtf(int set) { wtf = set; }
 
 public:
@@ -56,8 +57,10 @@ public:
 
 	static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 
+	void delay(int milliSeconds);
+	
 	void Run();
-
+	
 	void Finish();
 
 };
