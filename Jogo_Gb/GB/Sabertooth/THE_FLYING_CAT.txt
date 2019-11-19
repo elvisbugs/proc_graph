@@ -1,0 +1,945 @@
+
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp> 
+#include <glm/gtc/matrix_transform.hpp> 
+#include <glm/gtc/type_ptr.hpp>
+#include <stdio.h>
+#include <stdlib.h>
+#include <SOIL.h>
+#include <iostream>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+/// CLASSES - 
+
+class Camadas {      
+public:
+	float z[8];
+	float offsetx[7]; 
+	float offsety[7];
+	unsigned int tid[8];  // armazenamento de texturas
+	float ratex[7];      // armazenamento do paralax
+	int over1 = 0;      // "vidas" do jogo
+	int over2 = 0;
+
+};
+
+class Player {             // gatinho
+public:
+
+	float xi = 0.0f;      // eixos do gatinho que mexem na tela
+	float yi = 0.0f;
+	float zi = 0.0f;
+	float x = 0.0f;      // eixos originais do gatinho
+	float y = 0.0f;
+	float z = 0.0f;
+};
+
+class Vaca {            // vaquinha
+public:
+	float vacax = 0.7f;      // posições da vaquinha iniciais
+	float vacay = -0.55f;
+	float vacaz = 0.0f;
+	int ponto1 = 0;          // vida da vaquinha
+};
+
+class Bird {                // passarinho
+public:
+	float birdx = 0.7f;      // posições do passarinho iniciais
+	float birdy = 0.55f;
+	float birdz = 0.0f;
+	int ponto2 = 0;         // vidas do passarinho
+};
+
+
+
+int main() {
+	if (!glfwInit()) {
+		fprintf(stderr, "ERROR: could not start GLFW3\n");
+		return 1;
+	}
+	GLFWwindow *window = glfwCreateWindow(800, 600, "THE FLYING CAT", NULL, NULL);
+	if (!window) {
+		fprintf(stderr, "ERROR: could not open window with GLFW3\n");
+		glfwTerminate();
+		return 1;
+	}
+	glfwMakeContextCurrent(window);
+	// inicia manipulador da extensão GLEW
+	glewExperimental = GL_TRUE;
+	glewInit();
+
+	//////////////////////////////////////////////////////// COMEÇOU ////////////////////////////////////////////
+
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_DEPTH_TEST);
+
+	// ENTRADA DE VÉRTICES E ATRIBUIÇÃO DE POSIÇÃO EM RELAÇÃO À PROJEÇÃO
+
+	const char* vertex_shader =  // VERTEX SHADER DAS CAMADAS
+		"#version 410\n"
+
+		"layout(location = 0) in vec3 vertex_position;"
+		"layout(location = 1) in vec3 color;"
+		"layout(location = 2) in vec2 texture_mapping;"
+
+		"out vec2 texture_coords;"
+
+		"uniform mat4 proj;"
+		"uniform mat4 matrix;"
+		"uniform float layer_z;"
+
+		"void main() {"
+		"texture_coords = texture_mapping;"
+		"gl_Position = proj * vec4(vertex_position.xy, layer_z, 1.0);"
+		"}";
+
+	const char* vertex_shader2 =  // VERTEX SHADER DO GATINHO
+		"#version 410\n"
+
+		"layout(location = 0) in vec3 vertex_position;"
+		"layout(location = 1) in vec3 color;"
+		"layout(location = 2) in vec2 texture_mapping;"
+
+		"out vec2 texture_coords;"
+
+		"uniform mat4 proj;"
+		"uniform mat4 matrix;"
+		"uniform mat4 trans;"
+		"uniform float layer_z;"
+
+		"void main() {"
+		"texture_coords = texture_mapping;"
+		"gl_Position = trans * matrix * proj * vec4(vertex_position.xy, layer_z, 1.0);"
+		"}";
+	const char* vertex_shader3 =  // VERTEX SHADER DA VAQUINHA
+		"#version 410\n"
+
+		"layout(location = 0) in vec3 vertex_position;"
+		"layout(location = 1) in vec3 color;"
+		"layout(location = 2) in vec2 texture_mapping;"
+
+		"out vec2 texture_coords;"
+
+		"uniform mat4 proj;"
+		"uniform mat4 matrix;"
+		"uniform mat4 trans;"
+		"uniform float layer_z;"
+
+		"void main() {"
+		"texture_coords = texture_mapping;"
+		"gl_Position = trans * matrix * proj * vec4(vertex_position.xy, layer_z, 1.0);"
+		"}";
+	const char* vertex_shader4 = // VERTEX SHADER DO PASSARINHO
+		"#version 410\n"
+
+		"layout(location = 0) in vec3 vertex_position;"
+		"layout(location = 1) in vec3 color;"
+		"layout(location = 2) in vec2 texture_mapping;"
+
+		"out vec2 texture_coords;"
+
+		"uniform mat4 proj;"
+		"uniform mat4 matrix;"
+		"uniform mat4 trans;"
+		"uniform float layer_z;"
+
+		"void main() {"
+		"texture_coords = texture_mapping;"
+		"gl_Position = trans * matrix * proj * vec4(vertex_position.xy, layer_z, 1.0);"
+		"}";
+	const char* vertex_shader5 =       // VERTEX DO GAME OVER
+		"#version 410\n"
+
+		"layout(location = 0) in vec3 vertex_position;"
+		"layout(location = 1) in vec3 color;"
+		"layout(location = 2) in vec2 texture_mapping;"
+
+		"out vec2 texture_coords;"
+
+		"uniform mat4 proj;"
+		"uniform mat4 matrix;"
+		"uniform mat4 trans;"
+		"uniform float layer_z;"
+
+		"void main() {"
+		"texture_coords = texture_mapping;"
+		"gl_Position = proj * vec4(vertex_position.xy, layer_z, 1.0);"
+		"}";
+	// FRAGMENT SHADER = PROMOVER COR E TEXTURA
+	const char* fragment_shader =     // FRAGMENT DAS CAMADAS
+		"#version 410\n"
+
+		"in vec2 texture_coords;"
+
+		"uniform sampler2D sprite;"
+		"uniform float offsetx;"
+		"uniform float offsety;"
+
+		"out vec4 frag_color;"
+
+		"void main() {"
+		"vec4 texel = texture(sprite, vec2(texture_coords.x + offsetx, texture_coords.y + offsety));"
+		"if(texel.a < 1) discard;"
+		"frag_color = texel;"
+		"}";
+	const char* fragment_shader2 =    // FRAGMENT DO GATINHO
+		"#version 410\n"
+
+		"in vec2 texture_coords;"
+
+		"uniform sampler2D sprite;"
+		"uniform float offsetx;"
+		"uniform float offsety;"
+
+		"out vec4 frag_color;"
+
+		"void main() {"
+		"vec4 texel = texture(sprite, vec2(texture_coords.x + offsetx, texture_coords.y + offsety));"
+		"if(texel.a < 1) discard;"
+		"frag_color = texel;"
+		"}";
+	const char* fragment_shader3 =    // FRAGMENT DA VAQUINHA
+		"#version 410\n"
+
+		"in vec2 texture_coords;"
+
+		"uniform sampler2D sprite;"
+		"uniform float offsetx;"
+		"uniform float offsety;"
+
+		"out vec4 frag_color;"
+
+		"void main() {"
+		"vec4 texel = texture(sprite, vec2(texture_coords.x + offsetx, texture_coords.y + offsety));"
+		"if(texel.a < 1) discard;"
+		"frag_color = texel;"
+		"}";
+	const char* fragment_shader4 =      // FRAGMENT DO PASSARINHO
+		"#version 410\n"
+
+		"in vec2 texture_coords;"
+
+		"uniform sampler2D sprite;"
+		"uniform float offsetx;"
+		"uniform float offsety;"
+
+		"out vec4 frag_color;"
+
+		"void main() {"
+		"vec4 texel = texture(sprite, vec2(texture_coords.x + offsetx, texture_coords.y + offsety));"
+		"if(texel.a < 1) discard;"
+		"frag_color = texel;"
+		"}";
+	const char* fragment_shader5 =      // FRAGMENT DO GAME OVER
+		"#version 410\n"
+
+		"in vec2 texture_coords;"
+
+		"uniform sampler2D sprite;"
+		"uniform float offsetx;"
+		"uniform float offsety;"
+
+		"out vec4 frag_color;"
+
+		"void main() {"
+		"vec4 texel = texture(sprite, vec2(texture_coords.x + offsetx, texture_coords.y + offsety));"
+		"if(texel.a < 1) discard;"
+		"frag_color = texel;"
+		"}";
+
+	float vertices[] = {													// POLIGONO INICIAL
+		// positions             // colors           // texture coords
+		 800.0f, 600.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,			// top right
+		 800.0f, 0.0f,	 0.0f,	 0.0f, 1.0f, 0.0f,   1.0f, 0.0f,		   // bottom right
+		 0.0f,   0.0f,	 0.0f,	 0.0f, 0.0f, 1.0f,   0.0f, 0.0f,		  // bottom left
+		 0.0f,   600.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f          // top left 
+	};
+	unsigned int indices[] = {                                          // ORDEM PARA OS VÉRTICES              
+		2, 3, 1,
+		3, 0, 1
+	};
+
+	float matrix[] = {                                                // MATRIZ PARA REDIMENCIONAMENTO DE OBJETOS
+		0.15f, 0.0f, 0.0f, 0.0f, // 1ª coluna
+		0.0f, 0.15f, 0.0f, 0.0f, // 2ª coluna
+		0.0f, 0.0f, 1.0f, 0.0f, // 3ª coluna
+		0.0f, 0.0f, 0.0f, 1.0f // 4ª coluna
+	};
+	
+	// VAO / VBO = VÉRTICE ; EBO = ÍNDICES    ---  MONTAR FIGURAS E MANDAR PRO SHADER
+
+	unsigned int VBO[5], VAO[5], EBO[5];	  // GERAÇÃO DE 5 DE CADA                
+	glGenVertexArrays(5, VAO);          
+	glGenBuffers(5, VBO);
+	glGenBuffers(5, EBO);
+
+	//1  
+
+	glBindVertexArray(VAO[0]);               // cria vértices
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[0]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	//2
+	glBindVertexArray(VAO[1]);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[1]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	//3
+	glBindVertexArray(VAO[2]); 
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[2]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	//4
+	glBindVertexArray(VAO[3]); 
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[3]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[3]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	//5
+	glBindVertexArray(VAO[4]); 
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO[4]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[4]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	// identifica vs e o associa com vertex_shader --- dá nome para eles e passa pro shadder_programme
+
+	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vs, 1, &vertex_shader, NULL);
+	glCompileShader(vs);
+	GLuint vs2 = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vs2, 1, &vertex_shader2, NULL);
+	glCompileShader(vs2);
+	GLuint vs3 = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vs3, 1, &vertex_shader3, NULL);
+	glCompileShader(vs3);
+	GLuint vs4 = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vs4, 1, &vertex_shader4, NULL);
+	glCompileShader(vs4);
+	GLuint vs5 = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vs5, 1, &vertex_shader5, NULL);
+	glCompileShader(vs5);
+
+	// identifica fs e o associa com fragment_shader   --- dá nome para eles e passa pro shadder_programme
+
+	GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fs, 1, &fragment_shader, NULL);
+	glCompileShader(fs);
+	GLuint fs2 = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fs2, 1, &fragment_shader2, NULL);
+	glCompileShader(fs2);
+	GLuint fs3 = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fs3, 1, &fragment_shader3, NULL);
+	glCompileShader(fs3);
+	GLuint fs4 = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fs4, 1, &fragment_shader4, NULL);
+	glCompileShader(fs4);
+	GLuint fs5 = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fs5, 1, &fragment_shader5, NULL);
+	glCompileShader(fs5);
+
+	// identifica do programa, adiciona partes e faz "linkagem"
+	GLuint shader_programme = glCreateProgram();
+	glAttachShader(shader_programme, fs);
+	glAttachShader(shader_programme, vs);
+
+	GLuint shader_programme2 = glCreateProgram();
+	glAttachShader(shader_programme2, fs2);
+	glAttachShader(shader_programme2, vs2);
+
+	GLuint shader_programme3 = glCreateProgram();
+	glAttachShader(shader_programme3, fs3);
+	glAttachShader(shader_programme3, vs3);
+
+	GLuint shader_programme4 = glCreateProgram();
+	glAttachShader(shader_programme4, fs4);
+	glAttachShader(shader_programme4, vs4);
+
+	GLuint shader_programme5 = glCreateProgram();
+	glAttachShader(shader_programme5, fs5);
+	glAttachShader(shader_programme5, vs5);
+
+	//glBindFragDataLocation(shader_programme, 0, "frag_color");
+	glLinkProgram(shader_programme); // passagem de variáveis CPU para GPU
+	glUseProgram(shader_programme);
+	glLinkProgram(shader_programme2); // passagem de variáveis CPU para GPU
+	glUseProgram(shader_programme2);
+	glLinkProgram(shader_programme3); // passagem de variáveis CPU para GPU
+	glUseProgram(shader_programme3);
+	glLinkProgram(shader_programme4); // passagem de variáveis CPU para GPU
+	glUseProgram(shader_programme4);
+	glLinkProgram(shader_programme5); // passagem de variáveis CPU para GPU
+	glUseProgram(shader_programme5);
+
+	///////  TEXTURAS 
+
+	unsigned int texture1, texture2, texture3, texture4, texture5, texture6, texture7, texture8;
+	
+	// TEXTURA 1
+	
+	glGenTextures(1, &texture1);
+
+	glBindTexture(GL_TEXTURE_2D, texture1); 
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	int width, height, nrChannels;
+	unsigned char *data = stbi_load("ceu.png", &width, &height, &nrChannels, 0);   // PASSA A IMAGEM PARA UMA VARIÁVEL
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);   // PASSA TEXTURA PRA DENTRO DO PROGRAMA
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 2
+
+	glGenTextures(1, &texture2);
+	glBindTexture(GL_TEXTURE_2D, texture2);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("montanha2.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 3
+
+	glGenTextures(1, &texture3);
+	glBindTexture(GL_TEXTURE_2D, texture3); 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("chão3.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 4
+
+	glGenTextures(1, &texture4);
+	glBindTexture(GL_TEXTURE_2D, texture4);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("prantas.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 5
+
+	glGenTextures(1, &texture5);
+
+	glBindTexture(GL_TEXTURE_2D, texture5); 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("catinho4.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 6
+
+	glGenTextures(1, &texture6);
+
+	glBindTexture(GL_TEXTURE_2D, texture6);
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("vaca.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 7
+
+	glGenTextures(1, &texture7);
+
+	glBindTexture(GL_TEXTURE_2D, texture7);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("bird.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	// TEXTURA 8
+
+	glGenTextures(1, &texture8);
+
+	glBindTexture(GL_TEXTURE_2D, texture8); 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	data = stbi_load("over2.png", &width, &height, &nrChannels, 0);
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	//// DECLARAÇÃO DE CLASSES NO PROGRAMA  --- PREDEFINIÇÃO
+
+	Camadas layers; 
+	Player pos;
+	Vaca posv;
+	Bird posb;
+
+	// PROFUNDIDADE DE CADA TEXTURA NA CLASSE LAYER
+	layers.z[0] = -0.99f;   
+	layers.z[1] = -0.6f;
+	layers.z[2] = -0.59f;
+	layers.z[3] = -0.3f;
+	layers.z[4] = -0.2f;
+	layers.z[5] = -0.4f;
+	layers.z[6] = -0.3f;
+	layers.z[7] = 1.0f;
+
+	// QUANTO TEM QUE ANDAR NA CLASSE LAYER
+	layers.offsetx[0] = 0.0f;  
+	layers.offsety[0] = 0.0f;
+	layers.offsetx[1] = 0.0f;
+	layers.offsety[1] = 0.0f;
+	layers.offsetx[2] = 0.0f;
+	layers.offsety[2] = 0.0f;
+	layers.offsetx[3] = 0.0f;
+	layers.offsety[3] = 0.0f;
+	layers.offsetx[4] = 0.0f;
+	layers.offsety[4] = 0.0f;
+	layers.offsetx[5] = 0.0f;
+	layers.offsety[5] = 0.0f; 
+	layers.offsetx[6] = 0.0f;
+	layers.offsety[6] = 0.0f;
+ 	
+	// PASSAR TEXTURA PRA DENTRO DA CLASSE LAYER
+	layers.tid[0] = texture1;
+	layers.tid[1] = texture2;
+	layers.tid[2] = texture3;
+	layers.tid[3] = texture4;
+	layers.tid[4] = texture5;
+	layers.tid[5] = texture6;
+	layers.tid[6] = texture7;
+	layers.tid[7] = texture8;
+
+	// VELOCIDADE DOS PARALLAX
+	layers.ratex[0] = 0.4f;
+	layers.ratex[1] = 0.8f;
+	layers.ratex[2] = 0.99f;
+	layers.ratex[3] = 0.99f;
+
+
+	float PARALLAX_RATE = 0.0024;  // TAXA DE MOVIMENTO DO PARALLAX (multiplicação posterior)
+
+	
+	int abacaxi = 0;              // 
+
+	glViewport(0.0f, 0.0f, 800.0f, 600.0f);                                       // DEFINIÇÃO DO TAMANHO DA TELA
+	glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);   // DEIXAR O TAMANHO DA TELA - TRANSFORMAÇÃO
+	if (window) {
+		glfwMakeContextCurrent(window);
+
+		glfwShowWindow(window);
+
+		while (!glfwWindowShouldClose(window)) {
+
+			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);                  // COR ATRÁS DA TELA
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			glUseProgram(shader_programme);
+
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+
+			// CENÁRIO 
+			
+			glBindVertexArray(VAO[0]);     // QUANTO VAI "CAMINHAR"
+			for (int i = 0; i < 4; i++) {
+
+				layers.offsetx[i] += layers.ratex[i] * PARALLAX_RATE;
+
+				glUniform1f(glGetUniformLocation(shader_programme, "offsetx"), layers.offsetx[i]);
+				glUniform1f(glGetUniformLocation(shader_programme, "offsety"), layers.offsety[i]);
+				glUniform1f(glGetUniformLocation(shader_programme, "layer_z"), layers.z[i]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, layers.tid[i]);
+				glUniform1i(glGetUniformLocation(shader_programme, "sprite"), 0);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+			}
+
+			// POSICIONANDO A VACA --  SEMPRE VOLTAR QUANDO A TELA TERMINA
+			posv.vacax = (posv.vacax) - 0.0045f;
+			if (posv.vacax <= -1.0f)                
+			{
+				posv.vacax = 1.2f;
+				posv.ponto1++;
+			}
+			// POSICONANDO PASSARINHO  --  SEMPRE VOLTAR QUANDO A TELA TERMINA
+			posb.birdx = posb.birdx - 0.0035f;
+			if (posb.birdx <= -1.0f)                
+			{
+				posb.birdx = 1.2f;
+				posb.ponto2++;
+			}
+			
+			// VACA -- REDIMENCIONAMENTO PARA O SHADER 
+			int matrixLocation2 = glGetUniformLocation(shader_programme3, "matrix");
+			glUseProgram(shader_programme3);
+			glUniformMatrix4fv(matrixLocation2, 1, GL_FALSE, matrix);
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme3, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+
+			glm::mat4 transform1 = glm::mat4(1.0f); 
+			transform1 = glm::translate(transform1, glm::vec3(posv.vacax, posv.vacay, posv.vacaz));
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme3, "trans"), 1, GL_FALSE, glm::value_ptr(transform1));
+
+			glBindVertexArray(VAO[2]);
+			glUniform1f(glGetUniformLocation(shader_programme3, "offsetx"), layers.offsetx[5]);
+			glUniform1f(glGetUniformLocation(shader_programme3, "offsety"), layers.offsety[5]);
+			glUniform1f(glGetUniformLocation(shader_programme3, "layer_z"), layers.z[5]);
+			
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, layers.tid[5]);
+			glUniform1i(glGetUniformLocation(shader_programme3, "sprite"), 0);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+			// PASSARINHO -- REDIMENCIONAMENTO PARA O SHADER
+			int matrixLocation3 = glGetUniformLocation(shader_programme4, "matrix");
+			glUseProgram(shader_programme4);
+			glUniformMatrix4fv(matrixLocation3, 1, GL_FALSE, matrix);
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme4, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+
+			glm::mat4 transform2 = glm::mat4(1.0f); 
+			transform2 = glm::translate(transform2, glm::vec3(posb.birdx, posb.birdy, posb.birdz));
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme4, "trans"), 1, GL_FALSE, glm::value_ptr(transform2));
+
+			glBindVertexArray(VAO[3]);
+			glUniform1f(glGetUniformLocation(shader_programme4, "offsetx"), layers.offsetx[6]);
+			glUniform1f(glGetUniformLocation(shader_programme4, "offsety"), layers.offsety[6]);
+			glUniform1f(glGetUniformLocation(shader_programme4, "layer_z"), layers.z[6]);
+			
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, layers.tid[6]);
+			glUniform1i(glGetUniformLocation(shader_programme4, "sprite"), 0);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+
+			// GATINHO -- REDIMENCIONAMENTO PARA O SHADER
+			int matrixLocation1 = glGetUniformLocation(shader_programme2, "matrix");
+			glUseProgram(shader_programme2);
+			glUniformMatrix4fv(matrixLocation1, 1, GL_FALSE, matrix);
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme2, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+
+			glBindVertexArray(VAO[1]);
+			glUniform1f(glGetUniformLocation(shader_programme2, "offsetx"), layers.offsetx[4]);
+			glUniform1f(glGetUniformLocation(shader_programme2, "offsety"), layers.offsety[4]);
+			glUniform1f(glGetUniformLocation(shader_programme2, "layer_z"), layers.z[4]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, layers.tid[4]);
+			glUniform1i(glGetUniformLocation(shader_programme2, "sprite"), 0);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+	        // AÇÕES DO TECLADO -- JOGO
+
+			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+				glfwSetWindowShouldClose(window, true);
+
+			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {      
+				if (pos.xi > -0.99f) {  // LIMITAÇÃO DA JANELA
+					pos.x = -0.005f;    // TANTO DO MOVIMENTO
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+			}
+			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_RELEASE)
+			{
+				pos.x = 0.0;
+				pos.y = 0.0;
+				pos.z = 0.0;
+			}
+			if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+				if (pos.xi < 0.99f) {
+					pos.x = 0.005;
+					pos.y = 0.0;
+					pos.z = 0.0;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+			}
+			if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+				if (pos.yi < 0.99f) {
+					pos.x = 0.0;
+					pos.y = 0.005;
+					pos.z = 0.0;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+			}
+			if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+				if (pos.yi > -0.99f) {
+					pos.x = 0.0f;
+					pos.y = -0.005f;
+					pos.z = 0.0f;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+			}
+			if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {   // PROFUNDIDADE
+				if (pos.zi > -0.9) {
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = -0.005f;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+			}
+			if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+				if (pos.zi < 0.9) {
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.005f;
+				}
+				else
+				{
+					pos.x = 0.0f;
+					pos.y = 0.0f;
+					pos.z = 0.0f;
+				}
+
+			}
+			// INCRIMENTO PARA O GATINHO ANDAR
+			pos.xi = pos.x + pos.xi;
+			pos.yi = pos.y + pos.yi;
+			pos.zi = pos.z + pos.zi;
+			std::cout << "x: " << pos.xi << ", " << "y :" << pos.yi << ", " << "z :" << pos.zi << std::endl;
+
+			glm::mat4 transform = glm::mat4(1.0f);         
+			transform = glm::translate(transform, glm::vec3(pos.xi, pos.yi, pos.zi));
+
+			glUniformMatrix4fv(glGetUniformLocation(shader_programme2, "trans"), 1, GL_FALSE, glm::value_ptr(transform));
+
+			// COLISÕES   -- SE COLIDE VOLTA PRA POSIÇÃO ZERO (CENTRO DA TELA)
+
+			if (pos.yi > posv.vacay && pos.yi < (posv.vacay + 0.4f) && pos.xi > posv.vacax && pos.xi < (posv.vacax + 0.4f) && pos.zi <= posv.vacaz)  
+			{
+				pos.xi = 0.0f;
+				pos.yi = 0.0f;
+				pos.zi = 0.0f;
+				layers.over1++;
+			}
+			if (pos.yi < posv.vacay && pos.yi > (posv.vacay - 0.4f) && pos.xi < posv.vacax && pos.xi > (posv.vacax - 0.4f) && pos.zi <= posv.vacaz) 
+			{
+				pos.xi = 0.0f;
+				pos.yi = 0.0f;
+				pos.zi = 0.0f;
+				layers.over1++;
+			}
+
+			if (pos.yi > posb.birdy && pos.yi < (posb.birdy + 0.4f) && pos.xi > posb.birdx && pos.xi < (posb.birdx + 0.4f) && pos.zi <= posb.birdz) 
+			{
+				pos.xi = 0.0f;
+				pos.yi = 0.0f;
+				pos.zi = 0.0f;
+				layers.over2++;
+			}
+			if (pos.yi > posb.birdy && pos.yi > (posb.birdy - 0.4f) && pos.xi < posb.birdx && pos.xi > (posb.birdx - 0.4f) && pos.zi <= posb.birdz) 
+			{
+				pos.xi = 0.0f;
+				pos.yi = 0.0f;
+				pos.zi = 0.0f;
+				layers.over2++;
+			}
+	
+			if (layers.over1 + layers.over2== 3)   // CHECAGEM PARA AS VIDAS -- GAME OVER
+			{
+				
+				glUseProgram(shader_programme5);
+				glUniformMatrix4fv(glGetUniformLocation(shader_programme5, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+				glBindVertexArray(VAO[4]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, layers.tid[7]);
+				glUniform1i(glGetUniformLocation(shader_programme5, "sprite"), 0);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+				if ((glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS))
+				{
+					layers.over1 = 0;
+					layers.over2 = 0;
+					abacaxi = 0;
+					continue;
+				}	
+			}
+			glfwPollEvents();
+			glfwSwapBuffers(window);
+
+		}
+	
+		glfwDestroyWindow(window);	// DESTRUIÇÃO DA JANELA
+	}
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
+}
