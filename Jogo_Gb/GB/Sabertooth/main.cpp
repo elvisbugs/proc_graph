@@ -107,7 +107,7 @@ int main() {
 		1, 2, 3  // second triangle
 	};
 
-	unsigned int VBO[2], VAO[2], EBO[2];
+	unsigned int VBO, VAO, EBO;
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 	glGenBuffers(1, &EBO);
