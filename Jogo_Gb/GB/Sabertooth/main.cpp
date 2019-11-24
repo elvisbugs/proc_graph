@@ -12,33 +12,39 @@
 
 #include "stb_image.h"
 
-class Retangulo {
-public:
-	float r = 0.0f;
-	float g = 0.0f;
-	float b = 0.0f;
-};
+unsigned char * loadImage(char *path) {
+	int width, height, nrChannels;
+	unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 0);   // PASSA A IMAGEM PARA UMA VARIÁVEL
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);   // PASSA TEXTURA PRA DENTRO DO PROGRAMA
 
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
 
+	return data;
+}
 
 
 int main() {
 
 	srand(time(NULL));
-	Retangulo ret[800];
-	for (int i = 0; i < 800; i++)
-	{
-		ret[i].r = (rand() % 255) / 255.f;
-		ret[i].g = (rand() % 255) / 255.f;
-		ret[i].b = (rand() % 255) / 255.f;
-	}
+	
+    /*(rand() % 255) / 255.f;
+    (rand() % 255) / 255.f;
+    (rand() % 255) / 255.f;
+	*/
 
 	if (!glfwInit()) {
 		fprintf(stderr, "ERROR: could not start GLFW3\n");
 		return 1;
 	}
 	GLFWwindow *window = glfwCreateWindow(
-		800, 600, "Triangulo", NULL, NULL);
+		1200.0f, 1000.0f, "Saboteur", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "ERROR: could not open window with GLFW3\n");
 		glfwTerminate();
@@ -83,23 +89,25 @@ int main() {
 		"frag_color = texel;"
 		"}";
 
-	float RW = 800.0f / 10.0f;
-	float RH = 600.0f / 20.0f;
+	float qtdX = 11.0;
+	float qtdY = qtdX * 2;
+	float RW = 1200.0f / qtdX;
+	float RH = 1000.0f / qtdY;
 
 	// identifica vs e o associa com vertex_shader
 	float vertices[] = {
 		// positions		//texture
-		 0.0f, RH / 2, 0.0f,	 0.0f, (1 / 6.0f),  // top right
-		 RW / 2, RH,	 0.0f,	 (1 / 6.0f), (1 / 3.0f),	// bottom right
-		 RW,   RH / 2, 0.0f,	 (1 / 3.0f), (1 / 6.0f), // bottom left
-		 RW / 2, 0.0F, 0.0f,	 (1 / 6.0f), 0.0f, // top left 
+		 0.0f, RH / 2.0f-20, 0.0f,			   0.0f, 0.5f,  // top right
+		 RW / 2.0f,   RH-20,	 0.0f,	 (1.f / 36), 1.0f,	// bottom right
+		 RW,   RH / 2.0f-20, 0.0f,	 (1.f / 18), 0.5f, // bottom left
+		 RW / 2.0f, 0.0F-20, 0.0f,	 (1.f / 36), 0.0f, // top left 
 	};
 	unsigned int indices[] = {
 		0, 1, 3, // first triangle
 		1, 2, 3  // second triangle
 	};
 
-	unsigned int VBO, VAO, EBO;
+	unsigned int VBO[2], VAO[2], EBO[2];
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 	glGenBuffers(1, &EBO);
@@ -141,23 +149,12 @@ int main() {
 	glGenTextures(1, &texture);
 
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	int width, height, nrChannels;
-	unsigned char *data = stbi_load("lava2.png", &width, &height, &nrChannels, 0);   // PASSA A IMAGEM PARA UMA VARIÁVEL
-	if (data)
-	{
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);   // PASSA TEXTURA PRA DENTRO DO PROGRAMA
-
-	}
-	else
-	{
-		std::cout << "Failed to load texture" << std::endl;
-	}
-	stbi_image_free(data);
+	unsigned char* textura = loadImage("tiles2.png");
 
 	time_t t;
 	int y = 0;
@@ -169,27 +166,26 @@ int main() {
 
 	double xpos, ypos;
 
-	int tileMap[10][10] = {
-	{5,5,5,5,5,5,5,5,5,1},
-	{5,1,3,1,1,1,1,1,1,1},
-	{5,1,5,5,5,1,5,5,5,5},
-	{5,1,5,1,1,1,1,1,1,5},
-	{5,1,5,5,5,5,5,5,1,5},
-	{5,1,5,1,1,3,1,1,1,5},
-	{5,1,1,1,5,1,5,5,1,5},
-	{5,5,5,5,5,1,1,1,1,5},
-	{5,1,1,1,1,1,5,5,5,5},
-	{1,1,5,5,5,5,5,5,5,5}
-	};
-
+	float tileMap[11][11];
+	srand(time(NULL));
+	for (int y = 0; y < qtdX; y++) {
+		for (int x = 0; x < qtdX; x++)
+		{
+			tileMap[y][x] = 14;
+		}
+	}
+	tileMap[1][5] = 0;
+	tileMap[9][5] = 8;
+	tileMap[9][2] = 8;
+	tileMap[9][8] = 8;
 		   	 
-	glViewport(0.0f, 0.0f, 800.0f, 600.0f);
-	glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+	glViewport(0.0f, 0.0f, 1200.0f, 1000.0f);
+	glm::mat4 projection = glm::ortho(0.0f, 1200.0f, 1000.0f, 0.0f, -1.0f, 1.0f);
 
 	while (!glfwWindowShouldClose(window)) {
 
 		// Define vao como verte array atual
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClearColor(0.34f, 0.49f, 0.27f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 
@@ -206,18 +202,18 @@ int main() {
 
 		//inicio rodada "for"
 
-		for (y = 0; y < 10; y++) {
+		for (y = 0; y < qtdX; y++) {
 
-			for (x = 0; x < 10; x++) {
+			for (x = 0; x < qtdX; x++) {
 
 				glm::mat4 transform = glm::mat4(1.0f);
-				transform = glm::translate(transform, glm::vec3((x*(RW / 2) + y * (RW / 2)), ((x*(RH / 2) - y * (RH / 2) + 300.0f)), 0.0f));
+				transform = glm::translate(transform, glm::vec3((x*(RW / 2.0f) + y * (RW / 2.0f)),((x*(RH / 2.0f) - y * (RH / 2.0f) + 250.0f)), 0.0f));
 				glUniformMatrix4fv(glGetUniformLocation(shader_programme, "trans"), 1, GL_FALSE, glm::value_ptr(transform));
 
 				//int i = x + y * 20;
-
-				glUniform1f(glGetUniformLocation(shader_programme, "offsetx"), tileMap[x][y] * (1 % 3));
-				glUniform1f(glGetUniformLocation(shader_programme, "offsety"), tileMap[x][y] * (1 / 3.0f));
+				float var = tileMap[y][x] * (1.0f / 18.0f);
+				glUniform1f(glGetUniformLocation(shader_programme, "offsetx"), var);
+				//glUniform1f(glGetUniformLocation(shader_programme, "offsety"), 14);
 
 
 				/*Exemplo:
@@ -236,8 +232,6 @@ int main() {
 
 				glUniform1i(glGetUniformLocation(shader_programme, "sprite"), 0);
 
-
-				//glUniform3f(glGetUniformLocation(shader_programme, "color"), ret[i].r, ret[i].g, ret[i].b);
 
 				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			}
