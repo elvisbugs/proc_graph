@@ -261,6 +261,32 @@ int main() {
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
+		if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+		{
+			for (int y = 0; y < qtdX; y++) {
+				for (int x = 0; x < qtdX; x++)
+				{
+					tileMap[y][x] = 11;
+					tabuleiro[y][x] = 0;
+					possivel[y][x] = 0;
+				}
+			}
+			possivel[1][4] = 1;
+			possivel[1][6] = 1;
+			possivel[0][5] = 1;
+			possivel[2][5] = 1;
+
+			tileMap[1][5] = 0;
+			tileMap[9][5] = 12;
+			tileMap[9][2] = 12;
+			tileMap[9][8] = 12;
+
+			tabuleiro[1][5] = 1;
+			tabuleiro[9][5] = 1;
+			tabuleiro[9][2] = 1;
+			tabuleiro[9][8] = 1;
+		}
+
 		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 		{
 			//getting cursor position
@@ -273,6 +299,7 @@ int main() {
 			bool tes1 = (mouseColuna == 9 && mouseLinha == 5);
 			bool tes2 = (mouseColuna == 9 && mouseLinha == 2);
 			bool tes3 = (mouseColuna == 9 && mouseLinha == 8);
+
 
 			if (!tes1 && !tes2 && !tes3 && tabuleiro[mouseColuna][mouseLinha] == 0 && possivel[mouseColuna][mouseLinha] == 1) {
 				int card = rand() % 7;
@@ -335,6 +362,42 @@ int main() {
 
 					possivel[mouseColuna][mouseLinha - 1] = 1;
 					possivel[mouseColuna][mouseLinha + 1] = 1;
+				}
+				//vira pra cima
+				else if (card == 8) {
+					possivel[mouseColuna][mouseLinha + 1] = 0;
+					possivel[mouseColuna - 1][mouseLinha] = 0;
+
+					possivel[mouseColuna + 1][mouseLinha] = 1;
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+				}
+				//vira pra cima
+				else if (card == 9) {
+					possivel[mouseColuna][mouseLinha + 1] = 1;
+					possivel[mouseColuna - 1][mouseLinha] = 0;
+
+					possivel[mouseColuna + 1][mouseLinha] = 1;
+					possivel[mouseColuna][mouseLinha - 1] = 0;
+				}
+				//vira pra cima
+				else if (card == 10) {
+					possivel[mouseColuna][mouseLinha + 1] = 0;
+					possivel[mouseColuna - 1][mouseLinha] = 1;
+
+					possivel[mouseColuna + 1][mouseLinha] = 0;
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+				}
+				if (mouseLinha == 5 && mouseColuna == 8) {
+					int var = (1 + rand() % 2 + 12);
+					tileMap[9][5] = var;
+				}
+				if (mouseLinha == 2 && mouseColuna == 8) {
+					int var = (1 + rand() % 2 + 12);
+					tileMap[9][2] = var;
+				}
+				if (mouseLinha == 8 && mouseColuna == 8) {
+					int var = (1 + rand() % 2 + 12);
+					tileMap[9][8] = var;
 				}
 			}
 
