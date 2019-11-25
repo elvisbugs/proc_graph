@@ -12,6 +12,7 @@
 #include <string>
 #include "stb_image.h"
 #include <vector>
+#include <list> 
 
 using namespace std;
 
@@ -170,19 +171,33 @@ int main() {
 	int x = 0;
 
 	float tileMap[11][11];
+	int tabuleiro[11][11];
+	int possivel[11][11];
 	srand(time(NULL));
 	for (int y = 0; y < qtdX; y++) {
 		for (int x = 0; x < qtdX; x++)
 		{
-			tileMap[y][x] = 14;
+			tileMap[y][x] = 11;
+			tabuleiro[y][x] = 0;
+			possivel[y][x] = 0;
 		}
 	}
-	tileMap[1][5] = 0;
-	tileMap[9][5] = 8;
-	tileMap[9][2] = 8;
-	tileMap[9][8] = 8;
+	possivel[1][4] = 1;
+	possivel[1][6] = 1;
+	possivel[0][5] = 1;
+	possivel[2][5] = 1;
 
-	vector<string> tabuleiro;
+	tileMap[1][5] = 0;
+	tileMap[9][5] = 12;
+	tileMap[9][2] = 12;
+	tileMap[9][8] = 12;
+
+	tabuleiro[1][5] = 1;
+	tabuleiro[9][5] = 1;
+	tabuleiro[9][2] = 1;
+	tabuleiro[9][8] = 1;
+
+	
 
 	double xpos = 0;
 	double ypos = 0;
@@ -217,18 +232,12 @@ int main() {
 			
 			for (int y = 0; y < qtdX; y++) {
 				for (int x = 0; x < qtdX; x++) {
-					string strl = std::to_string(y);
-					string strc = std::to_string(x);
-					string strx = std::to_string(x * (RW / 2.0f) + y * (RW / 2.0f));
-					string stry = std::to_string((x * (RH / 2.0f) - y * (RH / 2.0f) + wHeight / 2.0f));
 
-					string strPos("l:" + strl + ";" + "c:" + strc + ";" + "x:" + strx + ";" + "y:" + stry + ";");
-					
-					tabuleiro.push_back(strPos);
-
+					float xi = x * (RW / 2.0f) + y * (RW / 2.0f);
+					float yi = (x * (RH / 2.0f) - y * (RH / 2.0f) + wHeight / 2.0f);
 
 					glm::mat4 transform = glm::mat4(1.0f);
-					transform = glm::translate(transform, glm::vec3((x * (RW / 2.0f) + y * (RW / 2.0f)), ((x * (RH / 2.0f) - y * (RH / 2.0f) + wHeight / 2.0f)), 0.0f));
+					transform = glm::translate(transform, glm::vec3(xi, yi, 0.0f));
 					glUniformMatrix4fv(glGetUniformLocation(shdr, "trans"), 1, GL_FALSE, glm::value_ptr(transform));
 									   
 					float var = tileMap[y][x] * (1.0f / 18.0f);
@@ -248,8 +257,6 @@ int main() {
 					nxPos = 0;
 				}
 			}
-		
-		
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
@@ -259,23 +266,79 @@ int main() {
 			//getting cursor position
 			
 			glfwGetCursorPos(window, &xpos, &ypos);
-			nxPos = (xpos - nyPos * RW / 2) / (RW/ 2);
-			nyPos = (nxPos*RH / 2 + ypos) / (RH );
 
-			//nTotal = nxPos + nyPos * 20;
-			//ypos = wHeight - ypos;
-			int linha = -1*(11-(((xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F)))/2));
-			int coluna =  11-(-(xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F)))/2;
-			
-			bool posI = (coluna == 1 && linha == 5);
-			bool tes1 = (coluna == 9 && linha == 5);
-			bool tes2 = (coluna == 9 && linha == 2);
-			bool tes3 = (coluna == 9 && linha == 8);
+			int mouseLinha = -1 * (11 - (((xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F))) / 2));
+			int mouseColuna = 11 - (-(xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F))) / 2;
 
-			if(!tes1 && !tes2 && !tes3 && !posI)
-				tileMap[coluna][linha] = 5;
+			bool tes1 = (mouseColuna == 9 && mouseLinha == 5);
+			bool tes2 = (mouseColuna == 9 && mouseLinha == 2);
+			bool tes3 = (mouseColuna == 9 && mouseLinha == 8);
 
-			std::cout << "linha: " << linha << " coluna: " << coluna << std::endl;
+			if (!tes1 && !tes2 && !tes3 && tabuleiro[mouseColuna][mouseLinha] == 0 && possivel[mouseColuna][mouseLinha] == 1) {
+				int card = 7;//rand() % 11;
+				tileMap[mouseColuna][mouseLinha] = card;
+				tabuleiro[mouseColuna][mouseLinha] = 1;
+				//card inicial
+				if (card == 0) {
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+					possivel[mouseColuna][mouseLinha + 1] = 1;
+					possivel[mouseColuna + 1][mouseLinha] = 1;
+					possivel[mouseColuna - 1][mouseLinha] = 1;
+				}
+				//car reto y 
+				else if(card == 1) {
+					possivel[mouseColuna-1][mouseLinha] = 1;
+					possivel[mouseColuna+1][mouseLinha] = 1;
+
+					possivel[mouseColuna][mouseLinha - 1] = 0;
+					possivel[mouseColuna][mouseLinha + 1] = 0;
+				}
+				//card vira a direita
+				else if (card == 2) {
+					possivel[mouseColuna][mouseLinha+1] = 1;
+					possivel[mouseColuna - 1][mouseLinha] = 1;
+
+					possivel[mouseColuna + 1][mouseLinha] = 0;
+					possivel[mouseColuna][mouseLinha - 1] = 0;
+				}
+				//card em t para os lados
+				else if (card == 3) {
+					possivel[mouseColuna][mouseLinha + 1] = 1;
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+					possivel[mouseColuna-1][mouseLinha] = 1;
+
+					possivel[mouseColuna + 1][mouseLinha] = 0;
+				}
+				//card em t em y
+				else if (card == 4) {
+					possivel[mouseColuna][mouseLinha + 1] = 1;
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+					possivel[mouseColuna - 1][mouseLinha] = 1;
+					possivel[mouseColuna + 1][mouseLinha] = 1;
+
+					possivel[mouseColuna][mouseLinha - 1] = 0;
+				}
+				//card tranca caminho em x
+				else if (card == 5) {
+					possivel[mouseColuna][mouseLinha + 1] = 0;
+					possivel[mouseColuna][mouseLinha - 1] = 0;
+				}
+				//card tranca caminho em y
+				else if (card == 6) {
+					possivel[mouseColuna - 1][mouseLinha] = 0;
+					possivel[mouseColuna + 1][mouseLinha] = 0;
+				}
+				//car reto x
+				else if (card == 7) {
+					possivel[mouseColuna - 1][mouseLinha] = 0;
+					possivel[mouseColuna + 1][mouseLinha] = 0;
+
+					possivel[mouseColuna][mouseLinha - 1] = 1;
+					possivel[mouseColuna][mouseLinha + 1] = 1;
+				}
+			}
+
+			std::cout << "linha: " << mouseLinha << " coluna: " << mouseColuna << std::endl;
 
 			delay(250);
 		}
