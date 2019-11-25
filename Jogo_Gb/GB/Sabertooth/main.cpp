@@ -275,7 +275,7 @@ int main() {
 			bool tes3 = (mouseColuna == 9 && mouseLinha == 8);
 
 			if (!tes1 && !tes2 && !tes3 && tabuleiro[mouseColuna][mouseLinha] == 0 && possivel[mouseColuna][mouseLinha] == 1) {
-				int card = 7;//rand() % 11;
+				int card = rand() % 7;
 				tileMap[mouseColuna][mouseLinha] = card;
 				tabuleiro[mouseColuna][mouseLinha] = 1;
 				//card inicial
