@@ -9,8 +9,9 @@
 #include <iostream>
 #include <SOIL.h>
 #include <time.h>
-#include <string.h>
+#include <string>
 #include "stb_image.h"
+#include <vector>
 
 using namespace std;
 
@@ -46,7 +47,7 @@ void loadImage(char *path) {
 	stbi_image_free(data);
 }
 
-GLuint generateShader(float wWidth, float wHeight, GLuint &VAO, GLuint &VBO, GLuint &EBO, GLuint &texture, GLuint textureNum) {
+GLuint generateShader(float wWidth, float wHeight, GLuint &VAO, GLuint &VBO, GLuint &EBO, GLuint &texture) {
 	const char* vertex_shader =
 		"#version 410\n"
 		"layout(location = 0) in vec3 vp;"
@@ -123,7 +124,7 @@ GLuint generateShader(float wWidth, float wHeight, GLuint &VAO, GLuint &VBO, GLu
 
 	glGenTextures(1, &texture);
 
-	glActiveTexture(GL_TEXTURE0 + textureNum);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -160,14 +161,10 @@ int main() {
 	glewExperimental = GL_TRUE;
 	glewInit();
 
-	GLuint VBO[2], VAO[2], EBO[2];
-	GLuint texture[2];
-	GLuint shdr[2];
-	for (int i = 0; i < 2; i++) {
-		shdr[i] = generateShader(wWidth, wHeight, VAO[i], VBO[i], EBO[i], texture[i], i);
-	}
-	//loadImage("tiles2.png");
-	//loadImage("tree.png");
+	GLuint VBO, VAO, EBO;
+	GLuint texture;
+	GLuint shdr = generateShader(wWidth, wHeight, VAO, VBO, EBO, texture);;
+	
 	time_t t;
 	int y = 0;
 	int x = 0;
@@ -185,6 +182,8 @@ int main() {
 	tileMap[9][2] = 8;
 	tileMap[9][8] = 8;
 
+	vector<string> tabuleiro;
+
 	double xpos = 0;
 	double ypos = 0;
 
@@ -199,39 +198,46 @@ int main() {
 	while (!glfwWindowShouldClose(window)) {
 
 		// Define vao como verte array atual
-		//glClearColor(0.34f, 0.49f, 0.27f, 0.0f);
-		glClearColor(0, 0, 0, 0.0f);
+		glClearColor(0.34f, 0.49f, 0.27f, 0.0f);
+		//glClearColor(0, 0, 0, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 
 		// desenha pontos a partir do p0 e 3 no total do VAO atual com o shader
 		// atualmente em uso
 
-		glUniformMatrix4fv(glGetUniformLocation(shdr[0], "proj"), 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(glGetUniformLocation(shdr, "proj"), 1, GL_FALSE, glm::value_ptr(projection));
 
-		glBindVertexArray(VAO[0]);
+		glBindVertexArray(VAO);
 
-		glUniform3f(glGetUniformLocation(shdr[0], "light"), 1.0f, 1.0f, 1.0f);
+		glUniform3f(glGetUniformLocation(shdr, "light"), 1.0f, 1.0f, 1.0f);
 
 
 		//inicio rodada "for"
-		if (mousePressed) {
+			
 			for (int y = 0; y < qtdX; y++) {
 				for (int x = 0; x < qtdX; x++) {
+					string strl = std::to_string(y);
+					string strc = std::to_string(x);
+					string strx = std::to_string(x * (RW / 2.0f) + y * (RW / 2.0f));
+					string stry = std::to_string((x * (RH / 2.0f) - y * (RH / 2.0f) + wHeight / 2.0f));
+
+					string strPos("l:" + strl + ";" + "c:" + strc + ";" + "x:" + strx + ";" + "y:" + stry + ";");
+					
+					tabuleiro.push_back(strPos);
+
 
 					glm::mat4 transform = glm::mat4(1.0f);
 					transform = glm::translate(transform, glm::vec3((x * (RW / 2.0f) + y * (RW / 2.0f)), ((x * (RH / 2.0f) - y * (RH / 2.0f) + wHeight / 2.0f)), 0.0f));
-					glUniformMatrix4fv(glGetUniformLocation(shdr[0], "trans"), 1, GL_FALSE, glm::value_ptr(transform));
-
-					//int i = x + y * 20;
+					glUniformMatrix4fv(glGetUniformLocation(shdr, "trans"), 1, GL_FALSE, glm::value_ptr(transform));
+									   
 					float var = tileMap[y][x] * (1.0f / 18.0f);
-					glUniform1f(glGetUniformLocation(shdr[0], "offsetx"), var);
+					glUniform1f(glGetUniformLocation(shdr, "offsetx"), var);
 
 					glActiveTexture(GL_TEXTURE0);
-					glBindTexture(GL_TEXTURE_2D, texture[0]);
+					glBindTexture(GL_TEXTURE_2D, texture);
 
-					glUniform1i(glGetUniformLocation(shdr[0], "sprite"), 0);
-
+					glUniform1i(glGetUniformLocation(shdr, "sprite"), 0);
 
 					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -240,11 +246,9 @@ int main() {
 
 					nyPos = 0;
 					nxPos = 0;
-
-					mousePressed = false;
 				}
 			}
-		}
+		
 		
 
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -259,13 +263,20 @@ int main() {
 			nyPos = (nxPos*RH / 2 + ypos) / (RH );
 
 			//nTotal = nxPos + nyPos * 20;
+			//ypos = wHeight - ypos;
+			int linha = -1*(11-(((xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F)))/2));
+			int coluna =  11-(-(xpos / (RW / 2.0f)) + (ypos / (RH / 2.0F)))/2;
+			
+			bool posI = (coluna == 1 && linha == 5);
+			bool tes1 = (coluna == 9 && linha == 5);
+			bool tes2 = (coluna == 9 && linha == 2);
+			bool tes3 = (coluna == 9 && linha == 8);
 
-			int coluna = xpos * (RW/2) + ypos*(RW / 2);
-			int linha = xpos * (RH / 2) - ypos*(RH/2);
+			if(!tes1 && !tes2 && !tes3 && !posI)
+				tileMap[coluna][linha] = 5;
 
-			std::cout << "x: " << nxPos << " y: " << nyPos << std::endl;
+			std::cout << "linha: " << linha << " coluna: " << coluna << std::endl;
 
-			mousePressed == true;
 			delay(250);
 		}
 
